@@ -1,0 +1,17 @@
+{
+  "name": "running-threejs-portfolio",
+  "version": "1.0.0",
+  "description": "GTA-style Three.js running game with company portfolio",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.162.0"
+  },
+  "devDependencies": {
+    "vite": "^5.1.0"
+  }
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio | 3D City Explorer</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loader-content">
+      <div class="spinner"></div>
+      <h1>Loading City...</h1>
+      <p>Preparing your 3D experience</p>
+    </div>
+  </div>
+
+  <!-- Instruction Overlay -->
+  <div id="instructions-overlay">
+    <div class="instructions-box">
+      <h1>Welcome to My Portfolio City</h1>
+      <p>Explore my work in a GTA-style 3D world!</p>
+      <div class="controls-info">
+        <div class="key-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>Move</span></div>
+        <div class="key-row"><kbd>SHIFT</kbd> <span>Sprint</span></div>
+        <div class="key-row"><kbd>SPACE</kbd> <span>Jump</span></div>
+        <div class="key-row"><kbd>MOUSE</kbd> <span>Look around</span></div>
+      </div>
+      <p class="hint">Walk into glowing buildings to view portfolio sections</p>
+      <button id="start-btn">Click to Enter City</button>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="minimap"></div>
+    <div id="player-stats">
+      <div class="stat-row">
+        <span class="stat-label">STAMINA</span>
+        <div class="stat-bar"><div id="stamina-bar" class="stat-fill"></div></div>
+      </div>
+    </div>
+    <div id="location-name">Downtown</div>
+    <div id="interaction-prompt" class="hidden">
+      Press <kbd>E</kbd> to interact
+    </div>
+  </div>
+
+  <!-- Portfolio Panels -->
+  <div id="portfolio-panel" class="hidden">
+    <button id="close-panel" class="close-btn">&times;</button>
+    <div id="panel-content"></div>
+  </div>
+
+  <!-- Crosshair -->
+  <div id="crosshair">+</div>
+
+  <canvas id="game-canvas"></canvas>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
