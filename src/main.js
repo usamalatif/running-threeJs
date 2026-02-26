@@ -18,6 +18,9 @@ const panelContent = document.getElementById('panel-content');
 const closePanel = document.getElementById('close-panel');
 const crosshair = document.getElementById('crosshair');
 
+// Hide crosshair for top-down view
+crosshair.classList.add('hidden');
+
 // ─── Renderer ───
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -29,12 +32,20 @@ renderer.toneMappingExposure = 1.0;
 
 // ─── Scene ───
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a1a, 0.008);
+scene.fog = new THREE.FogExp2(0x0a0a1a, 0.004);
 scene.background = new THREE.Color(0x0a0a1a);
 
-// ─── Camera ───
-const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 500);
-camera.position.set(0, 8, 20);
+// ─── Camera (Orthographic top-down) ───
+let zoomLevel = 40; // world units visible vertically / 2
+const aspect = window.innerWidth / window.innerHeight;
+const camera = new THREE.OrthographicCamera(
+  -zoomLevel * aspect, zoomLevel * aspect,
+  zoomLevel, -zoomLevel,
+  0.1, 500
+);
+// Slight angle tilt for that classic top-down-with-depth feel
+camera.position.set(0, 120, 40);
+camera.lookAt(0, 0, 0);
 
 // ─── Lighting ───
 // Ambient
@@ -119,13 +130,9 @@ const minimap = new Minimap(minimapContainer);
 
 // ─── Input State ───
 const keys = {};
-let mouseX = 0;
-let mouseY = 0;
-let cameraYaw = 0;
-let cameraPitch = 0.3;
-let isPointerLocked = false;
 let panelOpen = false;
 let nearBuilding = null;
+let gameStarted = false;
 
 // ─── Input Handlers ───
 document.addEventListener('keydown', (e) => {
@@ -142,27 +149,22 @@ document.addEventListener('keyup', (e) => {
   keys[e.code] = false;
 });
 
-document.addEventListener('mousemove', (e) => {
-  if (!isPointerLocked) return;
-  cameraYaw -= e.movementX * 0.002;
-  cameraPitch -= e.movementY * 0.002;
-  cameraPitch = Math.max(-0.5, Math.min(1.2, cameraPitch));
-});
+// Scroll to zoom in/out
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoomLevel += e.deltaY * 0.03;
+  zoomLevel = Math.max(15, Math.min(80, zoomLevel));
+  updateCameraFrustum();
+}, { passive: false });
 
-document.addEventListener('pointerlockchange', () => {
-  isPointerLocked = document.pointerLockElement === canvas;
-  if (!isPointerLocked && !panelOpen) {
-    crosshair.classList.add('hidden');
-  } else if (isPointerLocked) {
-    crosshair.classList.remove('hidden');
-  }
-});
-
-canvas.addEventListener('click', () => {
-  if (!isPointerLocked && !panelOpen) {
-    canvas.requestPointerLock();
-  }
-});
+function updateCameraFrustum() {
+  const a = window.innerWidth / window.innerHeight;
+  camera.left = -zoomLevel * a;
+  camera.right = zoomLevel * a;
+  camera.top = zoomLevel;
+  camera.bottom = -zoomLevel;
+  camera.updateProjectionMatrix();
+}
 
 closePanel.addEventListener('click', closePortfolioPanel);
 
@@ -173,14 +175,11 @@ function openPanel(key) {
   panelContent.innerHTML = data.content;
   portfolioPanel.classList.remove('hidden');
   panelOpen = true;
-  document.exitPointerLock();
-  crosshair.classList.add('hidden');
 }
 
 function closePortfolioPanel() {
   portfolioPanel.classList.add('hidden');
   panelOpen = false;
-  canvas.requestPointerLock();
 }
 
 // ─── Movement & Collision ───
@@ -204,25 +203,19 @@ function checkCollision(pos) {
 function updateMovement(delta) {
   if (panelOpen) return;
 
-  const sprint = keys['ShiftLeft'] && character.stamina > 0;
+  const sprint = (keys['ShiftLeft'] || keys['ShiftRight']) && character.stamina > 0;
   const speed = sprint ? 14 : 7;
 
   moveDir.set(0, 0, 0);
-  if (keys['KeyW']) moveDir.z -= 1;
-  if (keys['KeyS']) moveDir.z += 1;
-  if (keys['KeyA']) moveDir.x -= 1;
-  if (keys['KeyD']) moveDir.x += 1;
+  // Top-down: W=up(-Z), S=down(+Z), A=left(-X), D=right(+X)
+  if (keys['KeyW'] || keys['ArrowUp']) moveDir.z -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) moveDir.z += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
 
   const isMoving = moveDir.lengthSq() > 0;
   if (isMoving) {
     moveDir.normalize();
-    // Rotate move direction by camera yaw
-    const sin = Math.sin(cameraYaw);
-    const cos = Math.cos(cameraYaw);
-    const rx = moveDir.x * cos - moveDir.z * sin;
-    const rz = moveDir.x * sin + moveDir.z * cos;
-    moveDir.x = rx;
-    moveDir.z = rz;
 
     const pos = character.getPosition();
     const newX = pos.x + moveDir.x * speed * delta;
@@ -260,18 +253,15 @@ function updateMovement(delta) {
   staminaBar.style.width = character.stamina + '%';
 }
 
-// ─── Camera Follow ───
+// ─── Camera Follow (Top-Down) ───
+const cameraOffset = new THREE.Vector3(0, 120, 40); // slight Z offset for angled view
+const cameraTarget = new THREE.Vector3();
+
 function updateCamera() {
   const pos = character.getPosition();
-  const cameraDistance = 10;
-  const cameraHeight = 3 + cameraPitch * 5;
-
-  const targetX = pos.x - Math.sin(cameraYaw) * cameraDistance;
-  const targetZ = pos.z - Math.cos(cameraYaw) * cameraDistance;
-  const targetY = pos.y + cameraHeight;
-
-  camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.1);
-  camera.lookAt(pos.x, pos.y + 1.5, pos.z);
+  cameraTarget.set(pos.x + cameraOffset.x, cameraOffset.y, pos.z + cameraOffset.z);
+  camera.position.lerp(cameraTarget, 0.08);
+  camera.lookAt(pos.x, 0, pos.z);
 }
 
 // ─── Proximity Check ───
@@ -346,9 +336,8 @@ function updateParticles(delta) {
 
 // ─── Resize Handler ───
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCameraFrustum();
 });
 
 // ─── Game Loop ───
@@ -387,7 +376,7 @@ function init() {
 
   startBtn.addEventListener('click', () => {
     instructionsOverlay.classList.add('hidden');
-    canvas.requestPointerLock();
+    gameStarted = true;
   });
 
   animate();
